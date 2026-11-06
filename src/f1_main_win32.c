@@ -52,6 +52,18 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             ui.race.car[ui.selected_car].requested_compound = F1_TYRE_INTERMEDIATE;
         if (screen == F1_UI_RACE && wparam == 'W')
             ui.race.car[ui.selected_car].requested_compound = F1_TYRE_WET;
+        if (screen == F1_UI_RACE && wparam == 'Z')
+            f1_ui_set_selected_strategy(&ui, F1_PACE_CONSERVE, ui.race.car[ui.selected_car].ers_mode);
+        if (screen == F1_UI_RACE && wparam == 'X')
+            f1_ui_set_selected_strategy(&ui, F1_PACE_STANDARD, ui.race.car[ui.selected_car].ers_mode);
+        if (screen == F1_UI_RACE && wparam == 'C')
+            f1_ui_set_selected_strategy(&ui, F1_PACE_PUSH, ui.race.car[ui.selected_car].ers_mode);
+        if (screen == F1_UI_RACE && wparam == 'V')
+            f1_ui_set_selected_strategy(&ui, ui.race.car[ui.selected_car].pace, F1_ERS_HARVEST);
+        if (screen == F1_UI_RACE && wparam == 'B')
+            f1_ui_set_selected_strategy(&ui, ui.race.car[ui.selected_car].pace, F1_ERS_BALANCED);
+        if (screen == F1_UI_RACE && wparam == 'N')
+            f1_ui_set_selected_strategy(&ui, ui.race.car[ui.selected_car].pace, F1_ERS_DEPLOY);
         if (wparam == VK_ESCAPE) PostMessage(window_handle, WM_CLOSE, 0, 0);
         return 0;
     }

@@ -139,6 +139,39 @@ static void test_development_action_uses_limits(void) {
     assert(ui.car.atr_hours < 100);
 }
 
+static void test_selected_driver_accepts_pace_and_ers_orders(void) {
+    F1Ui ui;
+    f1_ui_init(&ui);
+    f1_ui_set_selected_strategy(&ui, F1_PACE_PUSH, F1_ERS_DEPLOY);
+    assert(ui.race.car[ui.selected_car].pace == F1_PACE_PUSH);
+    assert(ui.race.car[ui.selected_car].ers_mode == F1_ERS_DEPLOY);
+    f1_ui_set_selected_strategy(&ui, F1_PACE_CONSERVE, F1_ERS_HARVEST);
+    assert(ui.race.car[ui.selected_car].pace == F1_PACE_CONSERVE);
+    assert(ui.race.car[ui.selected_car].ers_mode == F1_ERS_HARVEST);
+}
+
+static unsigned long long replay_hash(F1RaceEventType type) {
+    F1Ui ui;
+    unsigned long long h = 1469598103934665603ull;
+    f1_ui_init(&ui);
+    f1_ui_set_replay(&ui, type, "EVENTO", 2);
+    f1_ui_render(&ui, F1_UI_RACE, -1, -1);
+    for (int y = 82; y < 188; ++y)
+        for (int x = 88; x < 552; ++x) { h ^= getpx(x, y); h *= 1099511628211ull; }
+    return h;
+}
+
+static void test_replay_scene_depends_on_event_type(void) {
+    unsigned long long overtake = replay_hash(F1_EVENT_OVERTAKE);
+    unsigned long long pit = replay_hash(F1_EVENT_PIT);
+    unsigned long long spin = replay_hash(F1_EVENT_SPIN);
+    unsigned long long crash = replay_hash(F1_EVENT_CRASH);
+    assert(overtake != pit);
+    assert(overtake != spin);
+    assert(overtake != crash);
+    assert(pit != spin && pit != crash && spin != crash);
+}
+
 static void test_every_driver_and_team_has_art(void) {
     unsigned long long seen_faces[64];
     for (int i = 0; i < F1_DRIVER_COUNT; ++i) {
@@ -184,6 +217,8 @@ int main(void) {
     test_ui_save_restores_career_race_and_team();
     test_hub_can_start_career_with_another_real_team();
     test_development_action_uses_limits();
+    test_selected_driver_accepts_pace_and_ers_orders();
+    test_replay_scene_depends_on_event_type();
     puts("f1_ui_test: OK");
     return 0;
 }

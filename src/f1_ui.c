@@ -272,16 +272,40 @@ static void draw_replay(F1Ui *ui) {
     rect(79,56,482,18,C_PANEL2);
     text(90,62,"REPETICION",C_YEL); text_r(548,62,"MOMENTO CLAVE",C_DIM);
     rect_dither(88,82,464,105,RGB(35,43,61),RGB(39,48,68));
-    rect(88,157,464,30,RGB(52,55,62));
-    line(88,167,552,167,C_WHT); line(88,177,552,177,C_WHT);
-    draw_pixel_car(216,139,RGB(232,32,42),2);
-    draw_pixel_car(306,125,RGB(255,126,22),2);
+    if (ui->replay_type == F1_EVENT_PIT) {
+        rect(88,143,464,44,RGB(62,64,70));
+        line(88,153,552,153,C_YEL); line(88,177,552,177,C_WHT);
+        rect(250,112,142,33,C_PANEL2); box(250,112,142,33,C_YEL);
+        draw_pixel_car(270,146,RGB(232,32,42),2);
+        for (int i = 0; i < 4; ++i) {
+            disc(250 + i * 38, 137 - (i&1)*8, 5, C_ORG);
+            rect(247 + i * 38, 142 - (i&1)*8, 7, 12, C_ORG);
+        }
+    } else if (ui->replay_type == F1_EVENT_SPIN) {
+        rect(88,157,464,30,RGB(52,55,62));
+        line(88,167,552,167,C_WHT); line(88,177,552,177,C_WHT);
+        line(190,181,292,145,C_BLK); line(194,184,296,148,C_BLK);
+        draw_pixel_car(285,132,RGB(232,32,42),2);
+        for (int i = 0; i < 6; ++i) px(380+i*5,151-(i&1)*4,C_DIM);
+    } else if (ui->replay_type == F1_EVENT_CRASH) {
+        rect(88,157,464,30,RGB(52,55,62));
+        line(88,167,552,167,C_WHT); line(88,177,552,177,C_WHT);
+        draw_pixel_car(245,142,RGB(232,32,42),2);
+        rect(335,148,13,5,C_RED); rect(365,136,8,8,C_PANEL3);
+        line(326,160,382,125,C_DIM); line(330,162,389,133,C_DIM);
+        for (int i = 0; i < 8; ++i) rect(318+i*13,142-(i%3)*8,3,3,i&1?C_RED:C_WHT);
+    } else {
+        rect(88,157,464,30,RGB(52,55,62));
+        line(88,167,552,167,C_WHT); line(88,177,552,177,C_WHT);
+        draw_pixel_car(216,139,RGB(232,32,42),2);
+        draw_pixel_car(306,125,RGB(255,126,22),2);
+    }
     text_c(320,199,ui->replay_text,C_WHT);
 }
 
 static void draw_race(F1Ui *ui) {
     char heading[96];
-    snprintf(heading, sizeof heading, "CARRERA  /  VUELTA %d DE %d", ui->race.lap + 1, ui->race.laps);
+    snprintf(heading, sizeof heading, "CARRERA / VUELTA %d DE %d / x%d", ui->race.lap + 1, ui->race.laps, ui->race.speed);
     topbar(heading);
     panel(8, 36, 250, 292, "CLASIFICACION");
     for (int i = 0; i < 11; ++i) {
@@ -323,7 +347,7 @@ static void draw_race(F1Ui *ui) {
         else if (sel->pit_requested) textf(430,294,C_CYN,"PARADA: %s",sel->requested_compound == F1_TYRE_SOFT ? "BLANDO" : sel->requested_compound == F1_TYRE_MEDIUM ? "MEDIO" : sel->requested_compound == F1_TYRE_HARD ? "DURO" : sel->requested_compound == F1_TYRE_INTERMEDIATE ? "INTER" : "LLUVIA");
         else text(430,294,"[P] PEDIR PARADA",C_CYN);
     }
-    textf(282,312,C_DIM,"[ESPACIO] PAUSA   VELOCIDAD  x%d",ui->race.speed);
+    text(282,312,"Z/X/C RITMO   V/B/N ERS   ESPACIO PAUSA",C_DIM);
     nav(3);
     if (ui->replay_frames > 0) { draw_replay(ui); --ui->replay_frames; }
 }
@@ -411,6 +435,11 @@ void f1_ui_select_other_car(F1Ui *ui) {
             return;
         }
     }
+}
+
+void f1_ui_set_selected_strategy(F1Ui *ui, F1Pace pace, F1ErsMode ers) {
+    if (!ui || !ui->race_ready || ui->selected_car < 0 || ui->selected_car >= F1_DRIVER_COUNT) return;
+    f1_race_set_order(&ui->race, ui->selected_car, pace, ers);
 }
 
 void f1_ui_tick(F1Ui *ui, float seconds) {

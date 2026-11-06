@@ -166,6 +166,7 @@ int f1_race_step(F1Race *r) {
             c->tyre_age_laps = 0;
             c->pit_requested = 0;
             ++c->stopped;
+            add_event(r, F1_EVENT_PIT, i, "completa su parada en boxes");
         }
         if (r->sector == 2 && !pit) ++c->tyre_age_laps;
         {
