@@ -1,0 +1,5 @@
+/build/
+/imported/
+/.superpowers/
+*.sav
+*.tmp
