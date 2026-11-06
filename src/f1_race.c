@@ -28,10 +28,10 @@ static float tyre_loss(F1TyreCompound c) {
     return loss[c];
 }
 
-static void add_event(F1Race *r, F1RaceEventType type, int driver, const char *verb) {
+static F1RaceEvent *add_event(F1Race *r, F1RaceEventType type, int driver, const char *verb) {
     F1RaceEvent *e;
     const F1DriverDef *d;
-    if (r->event_count >= F1_RACE_EVENTS) return;
+    if (r->event_count >= F1_RACE_EVENTS) return 0;
     e = &r->events[r->event_count++];
     d = &F1_DRIVERS[r->car[driver].driver_index];
     memset(e, 0, sizeof *e);
@@ -42,6 +42,7 @@ static void add_event(F1Race *r, F1RaceEventType type, int driver, const char *v
     e->driver_b = -1;
     e->replay = 1;
     snprintf(e->text, sizeof e->text, "%s %s", d->code, verb);
+    return e;
 }
 
 static void sort_order(F1Race *r) {
@@ -80,9 +81,20 @@ int f1_race_setup(F1Race *r, F1Game *g, int circuit_index, int short_laps) {
         r->car[i].tyre_wear = 100.0f;
         r->car[i].fuel_kg = r->laps * 1.65f + 1.5f;
         r->car[i].ers_mj = 4.0f;
+        r->car[i].car_performance = (unsigned char)team_strength(&F1_DRIVERS[di]);
         r->car[i].total_time_ms = i * 120;
     }
     return 0;
+}
+
+void f1_race_set_team_performance(F1Race *r, const char *team_id, int performance) {
+    int i;
+    if (!r || !team_id) return;
+    performance = clampi(performance, 1, 100);
+    for (i = 0; i < F1_DRIVER_COUNT; ++i) {
+        const F1DriverDef *d = &F1_DRIVERS[r->car[i].driver_index];
+        if (strcmp(d->team_id, team_id) == 0) r->car[i].car_performance = (unsigned char)performance;
+    }
 }
 
 void f1_race_set_order(F1Race *r, int car, F1Pace pace, F1ErsMode ers) {
@@ -108,7 +120,9 @@ int f1_race_set_speed(F1Race *r, int speed) {
 
 int f1_race_step(F1Race *r) {
     int i;
+    short old_order[F1_MAX_DRIVERS];
     if (!r || r->finished) return 1;
+    memcpy(old_order, r->order, sizeof old_order);
     if (r->neutralized_steps > 0 && --r->neutralized_steps == 0) r->track_state = F1_TRACK_GREEN;
     r->track_water = clampf(r->track_water + r->rain * 0.018f - (1.0f - r->rain) * 0.006f, 0.0f, 1.0f);
     for (i = 0; i < F1_DRIVER_COUNT; ++i) {
@@ -122,7 +136,7 @@ int f1_race_step(F1Race *r) {
         pace_gain = c->pace == F1_PACE_PUSH ? 0.018f : c->pace == F1_PACE_CONSERVE ? -0.018f : 0.0f;
         ers_gain = c->ers_mode == F1_ERS_DEPLOY && c->ers_mj > 0.2f ? 0.012f :
                    c->ers_mode == F1_ERS_HARVEST ? -0.008f : 0.0f;
-        skill = (d->pace * 0.55f + d->racecraft * 0.2f + team_strength(d) * 0.25f) / 100.0f;
+        skill = (d->pace * 0.55f + d->racecraft * 0.2f + c->car_performance * 0.25f) / 100.0f;
         noise = ((int)(rrnd(r) % 401u) - 200) / 100000.0f;
         sector_ms = (int)(33500.0f * (1.24f - skill * 0.22f + wear_penalty - pace_gain - ers_gain - (grip - 1.0f) + noise));
         if (r->track_state == F1_TRACK_SAFETY_CAR) sector_ms = sector_ms * 145 / 100;
@@ -163,6 +177,16 @@ int f1_race_step(F1Race *r) {
         }
     }
     sort_order(r);
+    for (i = 0; i < F1_DRIVER_COUNT; ++i) if (r->order[i] != old_order[i]) {
+        int old_position;
+        for (old_position = i + 1; old_position < F1_DRIVER_COUNT; ++old_position)
+            if (old_order[old_position] == r->order[i]) break;
+        if (old_position < F1_DRIVER_COUNT) {
+            F1RaceEvent *event = add_event(r, F1_EVENT_OVERTAKE, r->order[i], "gana una posicion");
+            if (event) event->driver_b = old_order[i];
+            break;
+        }
+    }
     ++r->sector;
     if (r->sector == 3) { r->sector = 0; ++r->lap; }
     if (r->lap >= r->laps) { r->finished = 1; sort_order(r); }

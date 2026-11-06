@@ -19,6 +19,7 @@ typedef struct {
     F1Pace pace;
     F1ErsMode ers_mode;
     float tyre_wear, fuel_kg, ers_mj;
+    unsigned char car_performance;
     int tyre_age_laps, total_time_ms, last_sector_ms;
     unsigned char pit_requested, stopped, retired;
 } F1RaceCar;
@@ -46,6 +47,7 @@ int f1_race_setup(F1Race *race, F1Game *game, int circuit_index, int short_laps)
 int f1_race_step(F1Race *race);
 void f1_race_set_order(F1Race *race, int car, F1Pace pace, F1ErsMode ers);
 void f1_race_request_pit(F1Race *race, int car, F1TyreCompound compound);
+void f1_race_set_team_performance(F1Race *race, const char *team_id, int performance);
 int f1_race_set_speed(F1Race *race, int speed);
 
 #endif

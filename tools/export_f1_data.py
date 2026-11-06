@@ -2,14 +2,10 @@
 """Generate dependency-free C tables from the editable F1 SQLite database."""
 from __future__ import annotations
 
+import json
 import sqlite3
 import sys
 from pathlib import Path
-
-
-FALLBACK_TRACK = ((80, 520), (150, 250), (370, 90), (700, 110),
-                  (920, 340), (870, 700), (610, 900), (260, 840),
-                  (80, 520))
 
 
 def cstr(value: object) -> str:
@@ -38,6 +34,8 @@ def main() -> int:
     """))
     circuits = list(db.execute("select * from circuits order by id"))
     rounds = list(db.execute("select * from rounds order by round_number"))
+    tracks_path = db_path.parent / "data" / "f1_tracks.json"
+    tracks = json.loads(tracks_path.read_text(encoding="utf-8"))
 
     lines = ['#include "f1_data.h"', '']
     lines.append("const F1TeamDef F1_TEAMS[] = {")
@@ -59,13 +57,14 @@ def main() -> int:
     lines.append("};")
     lines.append("const int F1_DRIVER_COUNT = (int)(sizeof F1_DRIVERS / sizeof F1_DRIVERS[0]);\n")
 
-    points = ",".join("{%d,%d}" % p for p in FALLBACK_TRACK)
     lines.append("const F1CircuitDef F1_CIRCUITS[] = {")
     for r in circuits:
+        track = tracks[r['id']]
+        points = ",".join("{%d,%d}" % tuple(p) for p in track)
         lines.append("    {%s,%s,%s,%.3ff,%.2ff,%.3ff,%.3ff,%d,%d,%d,%d,{%s}}," % (
             cstr(r['id']), cstr(r['name']), cstr(r['country']), r['length_km'] or 5.0,
             r['pit_loss_seconds'], r['safety_car_probability'], r['rain_probability'],
-            r['laps'] or 55, r['overtaking'], r['tyre_degradation'], len(FALLBACK_TRACK), points))
+            r['laps'] or 55, r['overtaking'], r['tyre_degradation'], len(track), points))
     lines.append("};")
     lines.append("const int F1_CIRCUIT_COUNT = (int)(sizeof F1_CIRCUITS / sizeof F1_CIRCUITS[0]);\n")
 

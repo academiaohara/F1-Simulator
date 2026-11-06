@@ -43,11 +43,37 @@ static void test_track_shapes_are_normalized(void) {
     }
 }
 
+static void test_calendar_tracks_have_distinct_real_geometry(void) {
+    int i, j;
+    for (i = 0; i < F1_CIRCUIT_COUNT; ++i) {
+        int duplicate = 0;
+        for (j = 0; j < i; ++j) {
+            int p, same = F1_CIRCUITS[i].point_count == F1_CIRCUITS[j].point_count;
+            for (p = 0; same && p < F1_CIRCUITS[i].point_count; ++p)
+                same = F1_CIRCUITS[i].points[p].x == F1_CIRCUITS[j].points[p].x &&
+                       F1_CIRCUITS[i].points[p].y == F1_CIRCUITS[j].points[p].y;
+            duplicate += same;
+        }
+        assert(duplicate == 0);
+    }
+}
+
+static void test_circuit_distance_and_laps_are_real_values(void) {
+    const F1CircuitDef *albert = f1_circuit_by_id("albert_park");
+    const F1CircuitDef *spa = f1_circuit_by_id("spa");
+    assert(albert && albert->laps == 58);
+    assert(albert->length_km > 5.27f && albert->length_km < 5.29f);
+    assert(spa && spa->laps == 44);
+    assert(spa->length_km > 7.00f && spa->length_km < 7.01f);
+}
+
 int main(void) {
     test_roster_shape();
     test_stable_ids_are_unique();
     test_relations_resolve();
     test_track_shapes_are_normalized();
+    test_calendar_tracks_have_distinct_real_geometry();
+    test_circuit_distance_and_laps_are_real_values();
     puts("f1_data_test: OK");
     return 0;
 }

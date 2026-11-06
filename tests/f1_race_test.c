@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "../src/f1_race.h"
 
@@ -73,6 +74,19 @@ static void test_speed_controls_are_bounded(void) {
     assert(f1_race_set_speed(&race, -1) == 0);
 }
 
+static void test_car_development_changes_sector_performance(void) {
+    F1Race fast = new_race(55u), slow = fast;
+    int ferrari = -1;
+    for (int i = 0; i < F1_DRIVER_COUNT; ++i)
+        if (strcmp(F1_DRIVERS[fast.car[i].driver_index].team_id, "ferrari") == 0) { ferrari = i; break; }
+    assert(ferrari >= 0);
+    f1_race_set_team_performance(&fast, "ferrari", 95);
+    f1_race_set_team_performance(&slow, "ferrari", 45);
+    assert(f1_race_step(&fast) == 0);
+    assert(f1_race_step(&slow) == 0);
+    assert(fast.car[ferrari].last_sector_ms < slow.car[ferrari].last_sector_ms);
+}
+
 static void test_incidents_are_present_but_rare(void) {
     int seed, incidents = 0, sectors = 0;
     for (seed = 1; seed <= 200; ++seed) {
@@ -90,13 +104,27 @@ static void test_incidents_are_present_but_rare(void) {
     assert(incidents < sectors / 20);
 }
 
+static void test_position_change_creates_overtake_replay(void) {
+    F1Race race = new_race(808u);
+    race.car[0].total_time_ms = 5000;
+    race.car[1].total_time_ms = 0;
+    assert(race.order[0] == 0 && race.order[1] == 1);
+    assert(f1_race_step(&race) == 0);
+    assert(race.order[0] == 1);
+    assert(race.event_count > 0);
+    assert(race.events[0].type == F1_EVENT_OVERTAKE);
+    assert(race.events[0].replay);
+}
+
 int main(void) {
     test_sector_consumes_tyre_fuel_and_ers();
     test_pit_stop_changes_compound_and_costs_time();
     test_wet_track_penalizes_slicks();
     test_race_finishes_with_unique_classification();
     test_speed_controls_are_bounded();
+    test_car_development_changes_sector_performance();
     test_incidents_are_present_but_rare();
+    test_position_change_creates_overtake_replay();
     puts("f1_race_test: OK");
     return 0;
 }
