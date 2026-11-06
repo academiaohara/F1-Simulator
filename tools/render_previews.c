@@ -16,5 +16,15 @@ int main(void) {
                      screen == F1_UI_CAR ? 130 : -1);
         png_save(paths[screen], 2);
     }
+    {
+        static const F1RaceEventType types[] = {F1_EVENT_PIT, F1_EVENT_SPIN, F1_EVENT_CRASH};
+        static const char *captions[] = {"PARADA EN BOXES", "TROMPO EN EL SECTOR 2", "ACCIDENTE: SAFETY CAR"};
+        static const char *extra[] = {"previews/replay_pit.png", "previews/replay_spin.png", "previews/replay_crash.png"};
+        for (int i = 0; i < 3; ++i) {
+            f1_ui_set_replay(&ui, types[i], captions[i], 120);
+            f1_ui_render(&ui, F1_UI_RACE, -1, -1);
+            png_save(extra[i], 2);
+        }
+    }
     return 0;
 }

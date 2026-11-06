@@ -50,7 +50,8 @@ Límites en el código: 24 pilotos (`F1_MAX_DRIVERS`) y 12 equipos (`F1_MAX_TEAM
 
 ## 4. Estado real: qué funciona y qué falta
 
-Funciona: datos 2026, 24 circuitos reales, clasificación, carrera por sectores con IA, desarrollo del coche
+Funciona: datos 2026, 24 circuitos reales, clasificación, carrera por sectores con IA, órdenes manuales de
+ritmo (`Z/X/C`) y ERS (`V/B/N`), repeticiones distintas para adelantamientos, boxes, trompos y accidentes, desarrollo del coche
 (lógica), contratos/eventos (lógica), guardado con checksum, calendario multitemporada (la carrera siguiente
 se prepara sola al acabar), hub/coche/desarrollo/carrera con datos reales del estado (esta versión).
 

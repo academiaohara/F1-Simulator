@@ -34,5 +34,6 @@ F1SaveResult f1_ui_load(F1Ui *ui, const char *path);
 int f1_ui_new_career(F1Ui *ui, const char *team_id);
 void f1_ui_cycle_team(F1Ui *ui, int direction);
 int f1_ui_start_project(F1Ui *ui, F1ComponentType component);
+void f1_ui_set_selected_strategy(F1Ui *ui, F1Pace pace, F1ErsMode ers);
 
 #endif

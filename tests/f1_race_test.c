@@ -38,6 +38,12 @@ static void test_pit_stop_changes_compound_and_costs_time(void) {
     assert(stop.car[0].compound == F1_TYRE_HARD);
     assert(stop.car[0].tyre_age_laps == 0);
     assert(stop.car[0].total_time_ms - before > stop.car[0].last_sector_ms);
+    {
+        int found = 0;
+        for (int e = 0; e < stop.event_count; ++e)
+            if (stop.events[e].type == F1_EVENT_PIT && stop.events[e].driver_a == 0) found = 1;
+        assert(found);
+    }
 }
 
 static void test_wet_track_penalizes_slicks(void) {
