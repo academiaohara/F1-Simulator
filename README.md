@@ -37,11 +37,8 @@ En la vista del coche, mueve el ratón sobre el monoplaza para destacar sus comp
 
 ## Compilar en Windows
 
-Requiere Visual Studio 2022 Build Tools con el componente de C++.
-
-```powershell
-.\build_windows.ps1
-```
+Doble clic en `build_windows.bat` (Visual Studio/Build Tools o MinGW) o, sin instalar nada, descarga el `.exe`
+de la pestaña *Actions* de GitHub. Detalles y solución de problemas en [`docs/GUIA.md`](docs/GUIA.md).
 
 El ejecutable queda en `build\f1_pixel_manager.exe`.
 
@@ -68,11 +65,15 @@ La suite cubre datos y trazados, calendario multitemporada, carrera, IA, desarro
 La base SQLite es la fuente editable. El ejecutable no necesita SQLite.
 
 ```sh
-python3 tools/enrich_f1_database.py "f1_pixel_manager (1).sqlite"
-python3 tools/export_f1_data.py "f1_pixel_manager (1).sqlite" src/f1_data_gen.c
+python3 tools/enrich_f1_database.py "f1_pixel_manager.sqlite"
+python3 tools/export_f1_data.py "f1_pixel_manager.sqlite" src/f1_data_gen.c
 ```
 
 `tools/import_track_shapes.py` convierte el GeoJSON original a coordenadas enteras normalizadas almacenadas en `data/f1_tracks.json`.
+
+## Qué falta
+
+Ver [`docs/GUIA.md`](docs/GUIA.md): estado real, tareas pendientes por prioridad y cómo añadir pilotos/equipos.
 
 ## Estructura
 
@@ -83,6 +84,7 @@ python3 tools/export_f1_data.py "f1_pixel_manager (1).sqlite" src/f1_data_gen.c
 - `src/f1_car*` — componentes y proyectos de desarrollo.
 - `src/f1_team*` — contratos, personal y eventos.
 - `src/f1_save*` — persistencia versionada.
+- `src/f1_art*` — caras de pilotos y logos de escuderías generados por código.
 - `src/f1_ui*`, `src/gfx*` — interfaz y framebuffer pixel art.
 - `tests/` — ejecutables headless deterministas.
 

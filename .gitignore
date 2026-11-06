@@ -3,3 +3,6 @@
 /.superpowers/
 *.sav
 *.tmp
+/release/
+*.obj
+*.exe

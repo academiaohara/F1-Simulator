@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "../src/f1_ui.h"
+#include "../src/f1_art.h"
 
 static int changed_pixels(void) {
     int n = 0;
@@ -138,7 +139,40 @@ static void test_development_action_uses_limits(void) {
     assert(ui.car.atr_hours < 100);
 }
 
+static void test_every_driver_and_team_has_art(void) {
+    unsigned long long seen_faces[64];
+    for (int i = 0; i < F1_DRIVER_COUNT; ++i) {
+        unsigned long long h = 1469598103934665603ull;
+        clear(C_BG);
+        f1_art_driver_portrait(10, 10, &F1_DRIVERS[i]);
+        for (int y = 0; y < F1_PORTRAIT_H; ++y)
+            for (int x = 0; x < F1_PORTRAIT_W; ++x) { h ^= getpx(10 + x, 10 + y); h *= 1099511628211ull; }
+        assert(getpx(10 + F1_PORTRAIT_W, 10) == C_BG);   /* no se sale de su caja */
+        assert(i < 64);
+        seen_faces[i] = h;
+        for (int j = 0; j < i; ++j) assert(seen_faces[j] != h);   /* caras distintas */
+    }
+    for (int i = 0; i < F1_TEAM_COUNT; ++i) {
+        clear(C_BG);
+        f1_art_team_logo(10, 10, &F1_TEAMS[i]);
+        assert(getpx(10 + F1_LOGO_W, 10) == C_BG);
+        assert(getpx(10 + F1_LOGO_W / 2, 10 + 3) != C_BG);
+    }
+}
+
+static void test_hub_follows_game_state(void) {
+    F1Ui ui;
+    f1_ui_init(&ui);
+    f1_ui_render(&ui, F1_UI_HUB, -1, -1);
+    ui.game.team_points[0] = 99;
+    f1_ui_render(&ui, F1_UI_HUB, -1, -1);   /* no debe fallar con puntos y equipo fuera del top 6 */
+    f1_ui_new_career(&ui, "cadillac");
+    f1_ui_render(&ui, F1_UI_HUB, -1, -1);
+}
+
 int main(void) {
+    test_every_driver_and_team_has_art();
+    test_hub_follows_game_state();
     gfx_init();
     test_all_primary_screens_render();
     test_car_hover_selects_component();
