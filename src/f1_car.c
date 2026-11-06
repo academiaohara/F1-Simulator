@@ -35,6 +35,8 @@ int f1_car_start_project(F1CarProgram *car, F1ComponentType component,
         return F1_CAR_ERR_INVALID;
     if (cost > car->budget) return F1_CAR_ERR_BUDGET;
     if (atr_cost > car->atr_hours) return F1_CAR_ERR_ATR;
+    if (cost < days * 10000 || atr_cost < (days / 4 > 5 ? days / 4 : 5))
+        return F1_CAR_ERR_INVALID;
     for (i = 0; i < F1_CAR_PROJECTS && car->project[i].active; ++i) {}
     if (i == F1_CAR_PROJECTS) return F1_CAR_ERR_CAPACITY;
     p = &car->project[i];

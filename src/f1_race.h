@@ -21,6 +21,7 @@ typedef struct {
     float tyre_wear, fuel_kg, ers_mj;
     unsigned char car_performance;
     int tyre_age_laps, total_time_ms, last_sector_ms;
+    int sectors_completed;
     unsigned char pit_requested, stopped, retired;
 } F1RaceCar;
 

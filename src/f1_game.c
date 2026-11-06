@@ -67,12 +67,16 @@ int f1_run_qualifying(F1Game *game) {
     return 0;
 }
 
-int f1_complete_weekend(F1Game *game) {
+int f1_complete_weekend(F1Game *game, const short *result, int count) {
     static const int points[10] = {25, 18, 15, 12, 10, 8, 6, 4, 2, 1};
-    int i;
-    if (!game || game->phase != F1_PHASE_RACE_READY) return 1;
+    int i, seen[F1_MAX_DRIVERS] = {0};
+    if (!game || !result || count != F1_DRIVER_COUNT || game->phase != F1_PHASE_RACE_READY) return 1;
+    for (i = 0; i < count; ++i) {
+        if (result[i] < 0 || result[i] >= F1_DRIVER_COUNT || seen[result[i]]) return 1;
+        seen[result[i]] = 1;
+    }
     for (i = 0; i < F1_DRIVER_COUNT; ++i) {
-        int di = game->grid[i];
+        int di = result[i];
         int ti = team_index(F1_DRIVERS[di].team_id);
         game->finish[i] = (short)di;
         if (i < 10) {
@@ -84,6 +88,8 @@ int f1_complete_weekend(F1Game *game) {
     if (game->round_index >= F1_ROUND_COUNT) {
         game->round_index = 0;
         ++game->year;
+        memset(game->driver_points, 0, sizeof game->driver_points);
+        memset(game->team_points, 0, sizeof game->team_points);
     }
     game->phase = F1_PHASE_PRE_WEEKEND;
     return 0;

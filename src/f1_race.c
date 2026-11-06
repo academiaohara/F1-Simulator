@@ -51,9 +51,17 @@ static void sort_order(F1Race *r) {
     for (i = 1; i < F1_DRIVER_COUNT; ++i) {
         short key = r->order[i];
         j = i - 1;
-        while (j >= 0 && (r->car[r->order[j]].retired > r->car[key].retired ||
-               (r->car[r->order[j]].retired == r->car[key].retired &&
-                r->car[r->order[j]].total_time_ms > r->car[key].total_time_ms))) {
+        while (j >= 0) {
+            const F1RaceCar *left = &r->car[r->order[j]], *right = &r->car[key];
+            int move = left->retired > right->retired;
+            if (left->retired == right->retired) {
+                if (left->retired)
+                    move = left->sectors_completed < right->sectors_completed ||
+                           (left->sectors_completed == right->sectors_completed &&
+                            left->total_time_ms > right->total_time_ms);
+                else move = left->total_time_ms > right->total_time_ms;
+            }
+            if (!move) break;
             r->order[j + 1] = r->order[j]; --j;
         }
         r->order[j + 1] = key;
@@ -120,10 +128,13 @@ int f1_race_set_speed(F1Race *r, int speed) {
 
 int f1_race_step(F1Race *r) {
     int i;
+    int deploy_safety_car = 0;
+    F1TrackState sector_state;
     short old_order[F1_MAX_DRIVERS];
     if (!r || r->finished) return 1;
     memcpy(old_order, r->order, sizeof old_order);
     if (r->neutralized_steps > 0 && --r->neutralized_steps == 0) r->track_state = F1_TRACK_GREEN;
+    sector_state = r->track_state;
     r->track_water = clampf(r->track_water + r->rain * 0.018f - (1.0f - r->rain) * 0.006f, 0.0f, 1.0f);
     for (i = 0; i < F1_DRIVER_COUNT; ++i) {
         F1RaceCar *c = &r->car[i];
@@ -139,7 +150,7 @@ int f1_race_step(F1Race *r) {
         skill = (d->pace * 0.55f + d->racecraft * 0.2f + c->car_performance * 0.25f) / 100.0f;
         noise = ((int)(rrnd(r) % 401u) - 200) / 100000.0f;
         sector_ms = (int)(33500.0f * (1.24f - skill * 0.22f + wear_penalty - pace_gain - ers_gain - (grip - 1.0f) + noise));
-        if (r->track_state == F1_TRACK_SAFETY_CAR) sector_ms = sector_ms * 145 / 100;
+        if (sector_state == F1_TRACK_SAFETY_CAR) sector_ms = sector_ms * 145 / 100;
         c->last_sector_ms = clampi(sector_ms, 12000, 120000);
         c->total_time_ms += c->last_sector_ms;
         c->fuel_kg = clampf(c->fuel_kg - (0.52f + c->pace * 0.04f), 0.0f, 200.0f);
@@ -167,14 +178,22 @@ int f1_race_step(F1Race *r) {
                 if (rrnd(r) % 5u == 0u) {
                     c->retired = 1;
                     add_event(r, F1_EVENT_CRASH, i, "abandona tras un accidente");
-                    r->track_state = F1_TRACK_SAFETY_CAR;
-                    r->neutralized_steps = 6;
+                    deploy_safety_car = 1;
                 } else {
                     c->total_time_ms += 6000 + (int)(rrnd(r) % 5000u);
                     add_event(r, F1_EVENT_SPIN, i, "hace un trompo");
                 }
             }
         }
+        if (!c->retired && c->fuel_kg <= 0.0f) {
+            c->retired = 1;
+            add_event(r, F1_EVENT_INFO, i, "abandona sin combustible");
+        }
+        if (!c->retired) ++c->sectors_completed;
+    }
+    if (deploy_safety_car) {
+        r->track_state = F1_TRACK_SAFETY_CAR;
+        r->neutralized_steps = 6;
     }
     sort_order(r);
     for (i = 0; i < F1_DRIVER_COUNT; ++i) if (r->order[i] != old_order[i]) {

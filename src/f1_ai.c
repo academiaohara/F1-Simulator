@@ -38,7 +38,10 @@ void f1_ai_update(F1Race *race, int index, float accuracy) {
         return;
     }
     if (estimate < (race->track_state == F1_TRACK_SAFETY_CAR ? 48.0f : 30.0f)) {
-        f1_race_request_pit(race, index, remaining > 9 ? F1_TYRE_HARD : F1_TYRE_MEDIUM);
+        F1TyreCompound replacement = race->track_water > 0.72f ? F1_TYRE_WET :
+                                      race->track_water > 0.28f ? F1_TYRE_INTERMEDIATE :
+                                      remaining > 9 ? F1_TYRE_HARD : F1_TYRE_MEDIUM;
+        f1_race_request_pit(race, index, replacement);
         return;
     }
     if (car->fuel_kg < remaining * 1.45f) car->pace = F1_PACE_CONSERVE;

@@ -51,11 +51,23 @@ static void test_uncertainty_changes_threshold_not_observation(void) {
            certain.car[6].pit_requested != uncertain.car[6].pit_requested);
 }
 
+static void test_worn_wet_tyre_is_replaced_with_wet_tyre(void) {
+    F1Race race = setup();
+    race.track_water = 0.82f;
+    race.rain = 0.9f;
+    race.car[7].compound = F1_TYRE_WET;
+    race.car[7].tyre_wear = 20.0f;
+    f1_ai_update(&race, 7, 1.0f);
+    assert(race.car[7].pit_requested);
+    assert(race.car[7].requested_compound == F1_TYRE_WET);
+}
+
 int main(void) {
     test_ai_pits_worn_tyres();
     test_ai_reacts_to_wet_track();
     test_ai_does_not_double_stop_fresh_correct_tyre();
     test_uncertainty_changes_threshold_not_observation();
+    test_worn_wet_tyre_is_replaced_with_wet_tyre();
     puts("f1_ai_test: OK");
     return 0;
 }

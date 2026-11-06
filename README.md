@@ -26,6 +26,10 @@ Esta rama contiene la primera base jugable de la reconstrucción:
 | Bajar / subir velocidad | `←` / `→` |
 | Elegir compuesto | `S` blando, `M` medio, `H` duro, `I` intermedio, `W` lluvia |
 | Solicitar parada | `P` |
+| Cambiar entre los dos pilotos | `Tab` |
+| Cambiar escudería al iniciar desde el hub | `[` / `]` |
+| Iniciar proyecto de suelo / instalar pieza lista | `N` / `Intro` en Desarrollo |
+| Guardar / cargar la carrera | `F5` / `F9` |
 | Probar ventana de repetición | `R` |
 | Salir | `Esc` |
 

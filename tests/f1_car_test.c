@@ -48,11 +48,29 @@ static void test_damage_and_reliability_are_bounded(void) {
     assert(car.component[F1_COMPONENT_SUSPENSION].condition == 100);
 }
 
+static void test_projects_cannot_gain_performance_for_free(void) {
+    F1CarProgram car;
+    f1_car_program_new(&car, 0, 0);
+    assert(f1_car_start_project(&car, F1_COMPONENT_FLOOR, 120, 0, 0) != F1_CAR_OK);
+    assert(car.active_projects == 0);
+    assert(car.component[F1_COMPONENT_FLOOR].performance == 60);
+}
+
+static void test_project_capacity_is_enforced(void) {
+    F1CarProgram car;
+    f1_car_program_new(&car, 10000000, 500);
+    for (int i = 0; i < F1_CAR_PROJECTS; ++i)
+        assert(f1_car_start_project(&car, (F1ComponentType)i, 20, 300000, 10) >= 0);
+    assert(f1_car_start_project(&car, F1_COMPONENT_CHASSIS, 20, 300000, 10) == F1_CAR_ERR_CAPACITY);
+}
+
 int main(void) {
     test_project_respects_budget_and_atr();
     test_project_finishes_and_requires_installation();
     test_diminishing_returns_cap_development();
     test_damage_and_reliability_are_bounded();
+    test_projects_cannot_gain_performance_for_free();
+    test_project_capacity_is_enforced();
     puts("f1_car_test: OK");
     return 0;
 }

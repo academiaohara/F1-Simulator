@@ -16,6 +16,42 @@ static const CarZone CAR_ZONES[] = {
     {400,164,52,28,F1_COMPONENT_BRAKES,"FRENOS"}
 };
 
+static int circuit_index_for_round(int round_index) {
+    int i;
+    const char *id = F1_ROUNDS[round_index].circuit_id;
+    for (i = 0; i < F1_CIRCUIT_COUNT; ++i)
+        if (strcmp(F1_CIRCUITS[i].id, id) == 0) return i;
+    return 0;
+}
+
+static int setup_current_race(F1Ui *ui, int speed) {
+    int circuit = circuit_index_for_round(ui->game.round_index);
+    if (f1_start_weekend(&ui->game) != 0 || f1_run_qualifying(&ui->game) != 0 ||
+        f1_race_setup(&ui->race, &ui->game, circuit, F1_CIRCUITS[circuit].laps) != 0) return 0;
+    f1_race_set_team_performance(&ui->race, ui->game.player_team_id, f1_car_overall(&ui->car));
+    f1_race_set_speed(&ui->race, speed);
+    ui->race_ready = 1;
+    ui->last_event_seen = 0;
+    for (int i = 0; i < F1_DRIVER_COUNT; ++i)
+        if (strcmp(F1_DRIVERS[ui->race.car[i].driver_index].team_id, ui->game.player_team_id) == 0) {
+            ui->selected_car = i;
+            break;
+        }
+    return 1;
+}
+
+static void complete_and_advance_race(F1Ui *ui) {
+    short result[F1_MAX_DRIVERS];
+    int speed = ui->race.speed;
+    for (int i = 0; i < F1_DRIVER_COUNT; ++i)
+        result[i] = ui->race.car[ui->race.order[i]].driver_index;
+    if (f1_complete_weekend(&ui->game, result, F1_DRIVER_COUNT) == 0) {
+        f1_car_advance_days(&ui->car, 14);
+        f1_team_roll_event(&ui->team, ui->game.round_index * 14, 0);
+        setup_current_race(ui, speed);
+    }
+}
+
 static void panel(int x, int y, int w, int h, const char *title) {
     rect(x, y, w, h, C_PANEL);
     box(x, y, w, h, C_PANEL3);
@@ -77,7 +113,7 @@ static void draw_hub(F1Ui *ui) {
     {
         int shown = 0;
         for (int i = 0; i < F1_DRIVER_COUNT && shown < 2; ++i)
-            if (strcmp(F1_DRIVERS[i].team_id, "ferrari") == 0)
+            if (strcmp(F1_DRIVERS[i].team_id, ui->game.player_team_id) == 0)
                 draw_driver_face(544 + shown++ * 34, 103, &F1_DRIVERS[i]);
     }
 
@@ -226,25 +262,87 @@ static void draw_race(F1Ui *ui) {
 
 void f1_ui_init(F1Ui *ui) {
     if (!ui) return;
+    f1_ui_new_career(ui, "ferrari");
+}
+
+int f1_ui_new_career(F1Ui *ui, const char *team_id) {
+    if (!ui || !f1_team_by_id(team_id)) return 1;
     memset(ui, 0, sizeof *ui);
-    f1_game_new(&ui->game, "ferrari", 2026u);
+    f1_game_new(&ui->game, team_id, 2026u);
     f1_car_program_new(&ui->car, 86400000, 100);
-    f1_start_weekend(&ui->game);
-    f1_run_qualifying(&ui->game);
-    if (f1_race_setup(&ui->race, &ui->game, 0, F1_CIRCUITS[0].laps) == 0) {
-        f1_race_set_team_performance(&ui->race, ui->game.player_team_id, f1_car_overall(&ui->car));
-        ui->race_ready = 1;
-        for (int i = 0; i < F1_DRIVER_COUNT; ++i)
-            if (strcmp(F1_DRIVERS[ui->race.car[i].driver_index].team_id, ui->game.player_team_id) == 0) {
-                ui->selected_car = i;
-                break;
-            }
-    }
+    f1_team_management_new(&ui->team, 86400000, 2027u);
+    setup_current_race(ui, 1);
     ui->hovered_component = -1;
+    return 0;
+}
+
+void f1_ui_cycle_team(F1Ui *ui, int direction) {
+    int i, current = 0;
+    if (!ui || direction == 0) return;
+    for (i = 0; i < F1_TEAM_COUNT; ++i)
+        if (strcmp(F1_TEAMS[i].id, ui->game.player_team_id) == 0) { current = i; break; }
+    current = (current + (direction > 0 ? 1 : F1_TEAM_COUNT - 1)) % F1_TEAM_COUNT;
+    f1_ui_new_career(ui, F1_TEAMS[current].id);
+}
+
+int f1_ui_start_project(F1Ui *ui, F1ComponentType component) {
+    int cost, slot;
+    if (!ui || component < 0 || component >= F1_COMPONENT_COUNT) return F1_CAR_ERR_INVALID;
+    cost = 900000 + component * 50000;
+    if (ui->team.cash < cost) return F1_CAR_ERR_BUDGET;
+    slot = f1_car_start_project(&ui->car, component, 30, cost, 10);
+    if (slot >= 0) ui->team.cash -= cost;
+    return slot;
+}
+
+F1SaveResult f1_ui_save(const F1Ui *ui, const char *path) {
+    F1SaveState state;
+    if (!ui) return F1_SAVE_ERR_STATE;
+    memset(&state, 0, sizeof state);
+    state.game = ui->game;
+    state.car = ui->car;
+    state.team = ui->team;
+    state.race = ui->race;
+    state.race_active = (unsigned char)(ui->race_ready ? 1 : 0);
+    return f1_save_write(path, &state);
+}
+
+F1SaveResult f1_ui_load(F1Ui *ui, const char *path) {
+    F1SaveState state;
+    F1SaveResult result;
+    if (!ui) return F1_SAVE_ERR_STATE;
+    result = f1_save_read(path, &state);
+    if (result != F1_SAVE_OK) return result;
+    ui->game = state.game;
+    ui->car = state.car;
+    ui->team = state.team;
+    ui->race = state.race;
+    ui->race_ready = state.race_active;
+    ui->race_accumulator = 0.0f;
+    ui->last_event_seen = ui->race.event_count;
+    ui->selected_car = 0;
+    for (int i = 0; i < F1_DRIVER_COUNT; ++i)
+        if (strcmp(F1_DRIVERS[ui->race.car[i].driver_index].team_id, ui->game.player_team_id) == 0) {
+            ui->selected_car = i;
+            break;
+        }
+    return F1_SAVE_OK;
 }
 
 void f1_ui_set_speed(F1Ui *ui, int speed) {
     if (ui && ui->race_ready) f1_race_set_speed(&ui->race, speed);
+}
+
+void f1_ui_select_other_car(F1Ui *ui) {
+    if (!ui || !ui->race_ready) return;
+    for (int offset = 1; offset <= F1_DRIVER_COUNT; ++offset) {
+        int candidate = (ui->selected_car + offset) % F1_DRIVER_COUNT;
+        const F1DriverDef *driver = &F1_DRIVERS[ui->race.car[candidate].driver_index];
+        if (strcmp(driver->team_id, ui->game.player_team_id) == 0) {
+            ui->selected_car = candidate;
+            return;
+        }
+    }
 }
 
 void f1_ui_tick(F1Ui *ui, float seconds) {
@@ -254,13 +352,18 @@ void f1_ui_tick(F1Ui *ui, float seconds) {
     interval = 5.0f / ui->race.speed;
     while (ui->race_accumulator >= interval && !ui->race.finished) {
         ui->race_accumulator -= interval;
-        f1_ai_update_all(&ui->race, ui->game.player_team_id, 0.82f);
+        for (int i = 0; i < F1_DRIVER_COUNT; ++i) {
+            const F1DriverDef *driver = &F1_DRIVERS[ui->race.car[i].driver_index];
+            if (strcmp(driver->team_id, ui->game.player_team_id) != 0 || i != ui->selected_car)
+                f1_ai_update(&ui->race, i, 0.82f);
+        }
         f1_race_step(&ui->race);
         if (ui->race.event_count > ui->last_event_seen) {
             const F1RaceEvent *event = &ui->race.events[ui->last_event_seen++];
             if (event->replay)
                 f1_ui_set_replay(ui, event->type, event->text, 120);
         }
+        if (ui->race.finished) complete_and_advance_race(ui);
     }
 }
 

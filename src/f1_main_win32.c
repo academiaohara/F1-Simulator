@@ -13,6 +13,7 @@ static int client_w = 1280, client_h = 720, scale = 2, offset_x, offset_y;
 static F1Ui ui;
 static F1UiScreen screen = F1_UI_HUB;
 static int previous_speed = 4;
+static char save_path[MAX_PATH] = "partida.sav";
 
 static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
     (void)window;
@@ -20,6 +21,15 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
     if (message == WM_KEYDOWN) {
         if (wparam >= '1' && wparam <= '4') screen = (F1UiScreen)(wparam - '1');
         if (wparam == 'R') f1_ui_set_replay(&ui, F1_EVENT_OVERTAKE, "LEC ADELANTA A NOR POR EL INTERIOR", 150);
+        if (wparam == VK_F5) f1_ui_save(&ui, save_path);
+        if (wparam == VK_F9) f1_ui_load(&ui, save_path);
+        if (screen == F1_UI_HUB && wparam == VK_OEM_4) f1_ui_cycle_team(&ui, -1);
+        if (screen == F1_UI_HUB && wparam == VK_OEM_6) f1_ui_cycle_team(&ui, 1);
+        if (screen == F1_UI_DEVELOPMENT && wparam == 'N')
+            f1_ui_start_project(&ui, F1_COMPONENT_FLOOR);
+        if (screen == F1_UI_DEVELOPMENT && wparam == VK_RETURN)
+            for (int slot = 0; slot < F1_CAR_PROJECTS; ++slot)
+                if (ui.car.project[slot].complete) { f1_car_install_project(&ui.car, slot); break; }
         if (screen == F1_UI_RACE && wparam == VK_SPACE) {
             if (ui.race.speed == 0) f1_ui_set_speed(&ui, previous_speed);
             else { previous_speed = ui.race.speed; f1_ui_set_speed(&ui, 0); }
@@ -30,6 +40,8 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             f1_ui_set_speed(&ui, ui.race.speed <= 1 ? 0 : ui.race.speed / 2);
         if (screen == F1_UI_RACE && wparam == 'P')
             f1_race_request_pit(&ui.race, ui.selected_car, ui.race.car[ui.selected_car].requested_compound);
+        if (screen == F1_UI_RACE && wparam == VK_TAB)
+            f1_ui_select_other_car(&ui);
         if (screen == F1_UI_RACE && wparam == 'S')
             ui.race.car[ui.selected_car].requested_compound = F1_TYRE_SOFT;
         if (screen == F1_UI_RACE && wparam == 'M')
@@ -87,6 +99,12 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR arguments, int 
     MSG message;
     LARGE_INTEGER frequency, last;
     (void)previous;
+    {
+        char *slash;
+        GetModuleFileNameA(NULL, save_path, MAX_PATH);
+        slash = strrchr(save_path, '\\');
+        if (slash) strcpy(slash + 1, "partida.sav");
+    }
     if (arguments && strstr(arguments, "--shot") == arguments)
         return screenshot_mode(arguments + 6);
     memset(&wc, 0, sizeof wc);

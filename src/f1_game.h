@@ -29,6 +29,6 @@ unsigned int f1_game_random(F1Game *game);
 int f1_game_new(F1Game *game, const char *team_id, unsigned int seed);
 int f1_start_weekend(F1Game *game);
 int f1_run_qualifying(F1Game *game);
-int f1_complete_weekend(F1Game *game);
+int f1_complete_weekend(F1Game *game, const short *result, int count);
 
 #endif

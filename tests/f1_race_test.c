@@ -116,6 +116,28 @@ static void test_position_change_creates_overtake_replay(void) {
     assert(race.events[0].replay);
 }
 
+static void test_running_out_of_fuel_retires_car(void) {
+    F1Race race = new_race(91u);
+    race.car[2].fuel_kg = 0.1f;
+    assert(f1_race_step(&race) == 0);
+    assert(race.car[2].retired);
+}
+
+static void test_retirements_are_ranked_by_distance(void) {
+    F1Race race = new_race(92u);
+    int pos_early = -1, pos_late = -1;
+    race.car[0].retired = 1;
+    race.car[0].sectors_completed = 2;
+    race.car[1].retired = 1;
+    race.car[1].sectors_completed = 20;
+    assert(f1_race_step(&race) == 0);
+    for (int i = 0; i < F1_DRIVER_COUNT; ++i) {
+        if (race.order[i] == 0) pos_early = i;
+        if (race.order[i] == 1) pos_late = i;
+    }
+    assert(pos_late < pos_early);
+}
+
 int main(void) {
     test_sector_consumes_tyre_fuel_and_ers();
     test_pit_stop_changes_compound_and_costs_time();
@@ -125,6 +147,8 @@ int main(void) {
     test_car_development_changes_sector_performance();
     test_incidents_are_present_but_rare();
     test_position_change_creates_overtake_replay();
+    test_running_out_of_fuel_retires_car();
+    test_retirements_are_ranked_by_distance();
     puts("f1_race_test: OK");
     return 0;
 }

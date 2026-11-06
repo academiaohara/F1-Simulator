@@ -46,11 +46,25 @@ static void test_round_and_season_progression(void) {
     for (i = 0; i < F1_ROUND_COUNT; ++i) {
         assert(f1_start_weekend(&g) == 0);
         assert(f1_run_qualifying(&g) == 0);
-        assert(f1_complete_weekend(&g) == 0);
+        assert(f1_complete_weekend(&g, g.grid, F1_DRIVER_COUNT) == 0);
     }
     assert(g.year == 2027);
     assert(g.round_index == 0);
     assert(g.phase == F1_PHASE_PRE_WEEKEND);
+    for (i = 0; i < F1_DRIVER_COUNT; ++i) assert(g.driver_points[i] == 0);
+}
+
+static void test_points_follow_race_result_not_grid(void) {
+    F1Game g;
+    short result[F1_MAX_DRIVERS];
+    assert(f1_game_new(&g, "ferrari", 101u) == 0);
+    assert(f1_start_weekend(&g) == 0);
+    assert(f1_run_qualifying(&g) == 0);
+    for (int i = 0; i < F1_DRIVER_COUNT; ++i) result[i] = g.grid[F1_DRIVER_COUNT - 1 - i];
+    assert(f1_complete_weekend(&g, result, F1_DRIVER_COUNT) == 0);
+    assert(g.driver_points[result[0]] == 25);
+    assert(g.finish[0] == result[0]);
+    assert(result[0] != g.grid[0]);
 }
 
 static void test_invalid_team_is_rejected(void) {
@@ -62,6 +76,7 @@ int main(void) {
     test_new_game_selects_team_and_calendar();
     test_weekend_reaches_race_grid();
     test_round_and_season_progression();
+    test_points_follow_race_result_not_grid();
     test_invalid_team_is_rejected();
     puts("f1_weekend_test: OK");
     return 0;
