@@ -1,0 +1,33 @@
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make test
+
+  windows-exe:
+    # Compila con MSVC en Windows, igual que build_windows.bat.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compilar
+        shell: cmd
+        run: build_windows.bat
+      - name: Captura de prueba del .exe
+        shell: cmd
+        run: build\f1_pixel_manager.exe --shot build\shot.png hub
+      - uses: actions/upload-artifact@v4
+        with:
+          name: f1_pixel_manager-windows
+          path: |
+            build/f1_pixel_manager.exe
+            build/shot.png
+            README.md
+            docs/GUIA.md

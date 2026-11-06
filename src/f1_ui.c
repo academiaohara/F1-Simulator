@@ -1,5 +1,6 @@
 #include "f1_ui.h"
 #include "f1_ai.h"
+#include "f1_art.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -60,30 +61,31 @@ static void panel(int x, int y, int w, int h, const char *title) {
 }
 
 static void draw_driver_face(int x, int y, const F1DriverDef *driver) {
-    const F1TeamDef *team = f1_team_by_id(driver->team_id);
-    unsigned int hash = (unsigned int)driver->number * 2654435761u;
-    Col skin = (hash & 1u) ? RGB(212,151,108) : RGB(239,186,137);
-    Col hair = (hash & 2u) ? RGB(55,34,27) : RGB(118,76,42);
-    Col shirt = team ? team->color_primary : C_PANEL3;
-    rect(x+5,y+3,18,18,skin);
-    rect(x+3,y+8,3,9,skin); rect(x+23,y+8,3,9,skin);
-    rect(x+5,y+2,18,5,hair); rect(x+5,y+5,4,5,hair);
-    if (hash & 4u) rect(x+19,y+5,4,3,hair);
-    rect(x+9,y+10,3,2,C_BLK); rect(x+17,y+10,3,2,C_BLK);
-    px(x+14,y+14,col_dark(skin,35));
-    rect(x+11,y+18,8,1,RGB(115,50,45));
-    rect(x+8,y+21,12,3,skin);
-    rect(x+3,y+24,23,8,shirt);
-    rect(x+11,y+24,7,8,C_TEXT);
-    text_c(x+14,y+34,driver->code,C_DIM);
+    f1_art_driver_portrait(x, y, driver);
 }
+
+static int team_slot(const char *id) {
+    for (int i = 0; i < F1_TEAM_COUNT; ++i) if (strcmp(F1_TEAMS[i].id, id) == 0) return i;
+    return -1;
+}
+
+static void sorted_team_order(const F1Ui *ui, int *order) {
+    for (int i = 0; i < F1_TEAM_COUNT; ++i) order[i] = i;
+    for (int i = 1; i < F1_TEAM_COUNT; ++i) {
+        int key = order[i], j = i - 1;
+        while (j >= 0 && ui->game.team_points[order[j]] < ui->game.team_points[key]) { order[j + 1] = order[j]; --j; }
+        order[j + 1] = key;
+    }
+}
+
+static int ui_year = 2026;
 
 static void topbar(const char *section) {
     rect(0, 0, SW, 28, RGB(8,12,26));
     rect(0, 27, SW, 1, C_RED);
     text(12, 7, "F1 PIXEL MANAGER", C_WHT);
     text(130, 7, section, C_YEL);
-    text_r(628, 7, "TEMPORADA 2026", C_DIM);
+    { char y[32]; snprintf(y, sizeof y, "TEMPORADA %d", ui_year); text_r(628, 7, y, C_DIM); }
 }
 
 static void nav(int active) {
@@ -94,41 +96,74 @@ static void nav(int active) {
     }
 }
 
+static void draw_circuit_shape(const F1CircuitDef *c, int x, int y, int w, int h, Col col) {
+    for (int i = 1; i < c->point_count; ++i) {
+        int x0 = x + c->points[i-1].x * w / 1000, y0 = y + c->points[i-1].y * h / 1000;
+        int x1 = x + c->points[i].x * w / 1000, y1 = y + c->points[i].y * h / 1000;
+        line(x0, y0, x1, y1, col); line(x0 + 1, y0, x1 + 1, y1, col);
+    }
+}
+
 static void draw_hub(F1Ui *ui) {
-    (void)ui;
+    const F1RoundDef *round = &F1_ROUNDS[ui->game.round_index];
+    const F1CircuitDef *circuit = f1_circuit_by_id(round->circuit_id);
+    const F1TeamDef *mine = f1_team_by_id(ui->game.player_team_id);
+    char line_text[96];
+    int order[F1_MAX_TEAMS], mine_pos = 0;
+    ui_year = ui->game.year;
     topbar("CENTRO DE EQUIPO");
     panel(12, 38, 380, 116, "PROXIMO GRAN PREMIO");
-    text(26, 63, "AUSTRALIA  /  ALBERT PARK", C_WHT);
-    text(26, 81, "RONDA 1 DE 24", C_DIM);
-    text(26, 103, "VIERNES", C_CYN); text(99, 103, "LIBRES", C_TEXT);
-    text(26, 121, "SABADO", C_CYN); text(99, 121, "CLASIFICACION", C_TEXT);
-    rect(270, 60, 102, 66, RGB(24,58,48));
-    for (int i = 0; i < 9; ++i) line(282 + i * 9, 114 - (i&1)*18, 290 + i * 9, 78 + (i&1)*20, C_GRN);
+    snprintf(line_text, sizeof line_text, "%s", round->name);
+    text_fit(26, 63, 230, line_text, C_WHT);
+    text_fit(26, 81, 230, circuit ? circuit->name : "-", C_DIM);
+    textf(26, 99, C_DIM, "RONDA %d DE %d%s", ui->game.round_index + 1, F1_ROUND_COUNT, round->sprint ? "  SPRINT" : "");
+    textf(26, 117, C_CYN, "%d VUELTAS   %.3f KM", circuit ? circuit->laps : 0, circuit ? circuit->length_km : 0.0f);
+    text(26, 135, "[4] IR A LA CARRERA", C_YEL);
+    rect(262, 58, 122, 90, RGB(24,58,48));
+    if (circuit) draw_circuit_shape(circuit, 270, 62, 100, 80, C_GRN);
 
     panel(402, 38, 226, 116, "ESTADO DEL EQUIPO");
-    text(416, 64, "PRESUPUESTO", C_DIM); text_r(614, 64, "86,4 M", C_GRN);
-    text(416, 84, "CONFIANZA", C_DIM); text_r(614, 84, "72%", C_YEL);
-    text(416, 104, "COCHE", C_DIM); text_r(614, 104, "6 DE 11", C_TEXT);
-    text(416, 124, "PILOTOS", C_DIM);
+    if (mine) f1_art_team_logo(414, 60, mine);
+    if (mine) text_fit(446, 64, 170, mine->name, C_WHT);
+    text(416, 86, "PRESUPUESTO", C_DIM); textf(614 - 8 * 7, 86, C_GRN, "%.1f M", ui->team.cash / 1000000.0f);
+    text(416, 104, "COCHE", C_DIM); textf(614 - 8 * 4, 104, C_TEXT, "%d", f1_car_overall(&ui->car));
+    text(416, 122, "PILOTOS", C_DIM);
     {
         int shown = 0;
         for (int i = 0; i < F1_DRIVER_COUNT && shown < 2; ++i)
             if (strcmp(F1_DRIVERS[i].team_id, ui->game.player_team_id) == 0)
-                draw_driver_face(544 + shown++ * 34, 103, &F1_DRIVERS[i]);
+                draw_driver_face(530 + shown++ * 40, 114, &F1_DRIVERS[i]);
     }
 
     panel(12, 164, 302, 164, "MENSAJES");
-    text(25, 190, "INGENIERIA", C_CYN); text(105, 190, "Nuevo suelo listo", C_TEXT);
-    text(25, 216, "PILOTOS", C_ORG); text(105, 216, "Reunion previa", C_TEXT);
-    text(25, 242, "METEO", C_CYN); text(105, 242, "Riesgo de lluvia 18%", C_TEXT);
-    text(25, 268, "DIRECTIVA", C_YEL); text(105, 268, "Objetivos de temporada", C_TEXT);
-    text(25, 304, "Los eventos aparecen con moderacion.", C_DIM);
+    text(25, 190, "INGENIERIA", C_CYN);
+    {
+        int ready = 0, active = 0;
+        for (int i = 0; i < F1_CAR_PROJECTS; ++i) { ready += ui->car.project[i].complete; active += ui->car.project[i].active; }
+        textf(105, 190, C_TEXT, ready ? "%d pieza(s) lista(s)" : "%d proyecto(s) activo(s)", ready ? ready : active);
+    }
+    text(25, 216, "METEO", C_CYN);
+    textf(105, 216, C_TEXT, "Riesgo de lluvia %d%%", circuit ? (int)(circuit->rain_probability * 100.0f + 0.5f) : 0);
+    text(25, 242, "DIRECTIVA", C_YEL);
+    text_fit(105, 242, 200, ui->team.last_event[0] ? ui->team.last_event : "Sin novedades", C_TEXT);
+    text(25, 268, "AYUDA", C_ORG); text(105, 268, "F5 guardar   F9 cargar", C_TEXT);
+    text(25, 304, "[ ] cambia de escuderia", C_DIM);
 
-    panel(324, 164, 304, 164, "CAMPEONATO");
+    panel(324, 164, 304, 164, "CAMPEONATO DE CONSTRUCTORES");
+    sorted_team_order(ui, order);
+    for (int i = 0; i < F1_TEAM_COUNT; ++i) if (order[i] == team_slot(ui->game.player_team_id)) mine_pos = i;
     for (int i = 0; i < 6; ++i) {
-        textf(340, 190 + i*20, i < 3 ? C_TEXT : C_DIM, "%d", i+1);
-        text(366, 190 + i*20, F1_TEAMS[i].name, i == 0 ? C_YEL : C_TEXT);
-        text_r(610, 190 + i*20, "0", C_DIM);
+        int row = i, t = order[i];
+        if (i == 5 && mine_pos > 4) { row = 5; t = order[mine_pos]; }
+        else if (i == 5) t = order[5];
+        {
+            int mine_row = t == team_slot(ui->game.player_team_id);
+            Col c = mine_row ? C_YEL : C_TEXT;
+            textf(334, 188 + row * 22, c, "%2d", (i == 5 && mine_pos > 4) ? mine_pos + 1 : i + 1);
+            f1_art_team_logo(358, 183 + row * 22, &F1_TEAMS[t]);
+            text_fit(392, 188 + row * 22, 160, F1_TEAMS[t].name, c);
+            textf(600 - 8 * 4, 188 + row * 22, c, "%4d", ui->game.team_points[t]);
+        }
     }
     nav(0);
 }
@@ -154,7 +189,10 @@ static void draw_car(F1Ui *ui, int mx, int my) {
             ui->hovered_component = z->component;
     }
     rect_dither(40, 76, 548, 134, RGB(18,25,46), RGB(20,28,52));
-    draw_pixel_car(105, 105, RGB(220,28,38), 6);
+    {
+        const F1TeamDef *tm = f1_team_by_id(ui->game.player_team_id);
+        draw_pixel_car(105, 105, tm ? RGB((tm->color_primary>>16)&255,(tm->color_primary>>8)&255,tm->color_primary&255) : RGB(220,28,38), 6);
+    }
     for (unsigned i = 0; i < sizeof CAR_ZONES / sizeof CAR_ZONES[0]; ++i) {
         const CarZone *z = &CAR_ZONES[i];
         Col c = ui->hovered_component == z->component ? C_YEL : C_PANEL3;
@@ -168,12 +206,17 @@ static void draw_car(F1Ui *ui, int mx, int my) {
         text(38, 198, name, C_YEL);
     }
     panel(12, 246, 294, 82, "RENDIMIENTO");
-    text(26, 272, "CARGA AERO", C_DIM); rect(126,272,150,7,C_PANEL3); rect(126,272,108,7,C_CYN);
-    text(26, 292, "VELOCIDAD", C_DIM); rect(126,292,150,7,C_PANEL3); rect(126,292,96,7,C_GRN);
+    {
+        int aero = (ui->car.component[F1_COMPONENT_FRONT_WING].performance + ui->car.component[F1_COMPONENT_REAR_WING].performance +
+                    ui->car.component[F1_COMPONENT_FLOOR].performance + ui->car.component[F1_COMPONENT_DIFFUSER].performance) / 4;
+        int power = (ui->car.component[F1_COMPONENT_ENGINE].performance + ui->car.component[F1_COMPONENT_ERS].performance) / 2;
+        text(26, 272, "CARGA AERO", C_DIM); rect(126,272,150,7,C_PANEL3); rect(126,272,aero*3/2,7,C_CYN);
+        text(26, 292, "POTENCIA", C_DIM); rect(126,292,150,7,C_PANEL3); rect(126,292,power*3/2,7,C_GRN);
+    }
     panel(316, 246, 302, 82, "LIMITES DE DESARROLLO");
-    text(330, 272, "TECHO PRESUPUESTARIO", C_DIM); text_r(603,272,"71%",C_YEL);
-    text(330, 292, "TUNEL / CFD (ATR)", C_DIM); text_r(603,292,"68%",C_CYN);
-    text(330, 312, "CAPACIDAD DE FABRICA", C_DIM); text_r(603,312,"2 / 3",C_TEXT);
+    textf(330, 272, C_DIM, "PRESUPUESTO"); textf(603-8*7,272,C_YEL,"%.1f M",ui->team.cash / 1000000.0f);
+    text(330, 292, "TUNEL / CFD (ATR)", C_DIM); textf(603-8*5,292,C_CYN,"%d H",ui->car.atr_hours);
+    text(330, 312, "PROYECTOS ACTIVOS", C_DIM); textf(603-8*3,312,C_TEXT,"%d/%d",ui->car.active_projects,F1_CAR_PROJECTS);
     nav(1);
 }
 
@@ -188,22 +231,32 @@ static void draw_development(F1Ui *ui) {
         rect(x,y+13,ui->car.component[i].performance*3/2,6,i<4?C_CYN:C_GRN);
         textf(x+155,y,C_DIM,"%d",ui->car.component[i].performance);
     }
-    panel(410, 38, 218, 140, "PROYECTO ACTIVO");
-    text(424, 66, "NUEVO SUELO", C_YEL);
-    text(424, 88, "18 DIAS RESTANTES", C_TEXT);
-    rect(424,108,186,8,C_PANEL3); rect(424,108,119,8,C_CYN);
-    text(424,130,"COSTE  2,8 M",C_DIM);
-    text(424,150,"GANANCIA EST.  +3",C_GRN);
+    panel(410, 38, 218, 140, "PROYECTOS");
+    {
+        static const char *names[] = {"ALERON DEL.","ALERON TRAS.","SUELO","DIFUSOR","CHASIS","SUSPENSION","REFRIGERACION","FRENOS","CAMBIO","MOTOR","ERS","FIABILIDAD"};
+        int shown = 0;
+        for (int i = 0; i < F1_CAR_PROJECTS; ++i) {
+            const F1CarProject *p = &ui->car.project[i];
+            if (!p->active) continue;
+            text(424, 62 + shown * 38, names[p->component], p->complete ? C_GRN : C_YEL);
+            rect(424, 78 + shown * 38, 186, 6, C_PANEL3);
+            rect(424, 78 + shown * 38, 186 * p->days_done / (p->days_total ? p->days_total : 1), 6, p->complete ? C_GRN : C_CYN);
+            if (p->complete) text_r(612, 62 + shown * 38, "LISTO (INTRO)", C_GRN);
+            else textf(612 - 8 * 10, 62 + shown * 38, C_DIM, "+%d  %dD", p->gain, p->days_total - p->days_done);
+            ++shown;
+        }
+        if (!shown) { text(424, 66, "SIN PROYECTOS", C_DIM); text(424, 88, "[N] INICIAR SUELO", C_YEL); }
+    }
     panel(410, 188, 218, 140, "RESTRICCIONES");
-    text(424,216,"PRESUPUESTO",C_DIM); text_r(612,216,"29,6 M",C_TEXT);
-    text(424,240,"ATR",C_DIM); text_r(612,240,"68 H",C_CYN);
-    text(424,264,"PROYECTOS",C_DIM); text_r(612,264,"1 / 3",C_YEL);
+    text(424,216,"PRESUPUESTO",C_DIM); textf(612 - 8 * 7,216,C_TEXT,"%.1f M",ui->team.cash / 1000000.0f);
+    text(424,240,"ATR",C_DIM); textf(612 - 8 * 5,240,C_CYN,"%d H",ui->car.atr_hours);
+    text(424,264,"PROYECTOS",C_DIM); textf(612 - 8 * 3,264,C_YEL,"%d/%d",ui->car.active_projects,F1_CAR_PROJECTS);
     text(424,294,"Rendimientos decrecientes",C_DIM);
     nav(2);
 }
 
-static void draw_track(void) {
-    const F1CircuitDef *c = &F1_CIRCUITS[0];
+static void draw_track(const F1Race *race) {
+    const F1CircuitDef *c = &F1_CIRCUITS[race->circuit_index];
     for (int i = 1; i < c->point_count; ++i) {
         int x0 = 282 + c->points[i-1].x * 238 / 1000;
         int y0 = 54 + c->points[i-1].y * 176 / 1000;
@@ -241,7 +294,17 @@ static void draw_race(F1Ui *ui) {
         else textf(184,60+i*22,C_DIM,"+%.3f",(ui->race.car[car_index].total_time_ms-ui->race.car[ui->race.order[0]].total_time_ms)/1000.0f);
     }
     panel(268, 36, 364, 202, "TRAZADO Y SECTORES");
-    draw_track();
+    draw_track(&ui->race);
+    for (int i = 0; i < F1_DRIVER_COUNT; ++i) {
+        const F1RaceCar *rc = &ui->race.car[i];
+        const F1CircuitDef *cc = &F1_CIRCUITS[ui->race.circuit_index];
+        const F1DriverDef *dd = &F1_DRIVERS[rc->driver_index];
+        const F1TeamDef *tt = f1_team_by_id(dd->team_id);
+        int seg = (rc->sectors_completed % 3) * (cc->point_count - 1) / 3 + (cc->point_count - 1) / 6;
+        int px_ = 282 + cc->points[seg].x * 238 / 1000, py_ = 54 + cc->points[seg].y * 176 / 1000;
+        if (rc->retired) continue;
+        disc(px_, py_, i == ui->selected_car ? 3 : 2, i == ui->selected_car ? C_WHT : (Col)tt->color_primary);
+    }
     text(282,216,"S1",C_CYN); text(322,216,"S2",C_YEL); text(362,216,"S3",C_ORG);
     panel(268, 246, 364, 82, "ESTRATEGIA");
     {
@@ -253,8 +316,13 @@ static void draw_race(F1Ui *ui) {
         textf(322,272,C_YEL,"%s  %dV",tyres[selected->compound],selected->tyre_age_laps);
         textf(430,272,C_TEXT,"RITMO %s",paces[selected->pace]);
     }
-    text(282,294,"ERS",C_DIM); rect(322,295,90,6,C_PANEL3); rect(322,295,66,6,C_GRN);
-    text(430,294,"PARADA  V18-22",C_CYN);
+    {
+        const F1RaceCar *sel = &ui->race.car[ui->selected_car];
+        text(282,294,"ERS",C_DIM); rect(322,295,90,6,C_PANEL3); rect(322,295,(int)(sel->ers_mj * 90.0f / 4.0f),6,C_GRN);
+        if (sel->retired) text(430,294,"RETIRADO",C_RED);
+        else if (sel->pit_requested) textf(430,294,C_CYN,"PARADA: %s",sel->requested_compound == F1_TYRE_SOFT ? "BLANDO" : sel->requested_compound == F1_TYRE_MEDIUM ? "MEDIO" : sel->requested_compound == F1_TYRE_HARD ? "DURO" : sel->requested_compound == F1_TYRE_INTERMEDIATE ? "INTER" : "LLUVIA");
+        else text(430,294,"[P] PEDIR PARADA",C_CYN);
+    }
     textf(282,312,C_DIM,"[ESPACIO] PAUSA   VELOCIDAD  x%d",ui->race.speed);
     nav(3);
     if (ui->replay_frames > 0) { draw_replay(ui); --ui->replay_frames; }
